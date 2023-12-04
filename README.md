@@ -15,7 +15,5 @@ Welcome to the Target Case Study repository! This project was completed as part 
 ## Project Structure
 
 - `SQL_Code/`: Contains the SQL code used for data analysis in Google BigQuery.
-  
-- `Tableau_Visualizations/`: Includes the Tableau workbooks and charts created for the case study.
 
 - `Target_Case_Study.pdf`: Comprehensive documentation covering questions, SQL code, and Tableau visualizations.
