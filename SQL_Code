@@ -1,0 +1,226 @@
+##1.2
+select min(date(order_purchase_timestamp)) Start_Date, max(date(order_purchase_timestamp)) End_Date,
+DATE_DIFF(max(date(order_purchase_timestamp)), min(date(order_purchase_timestamp)), day) Number_of_Days
+from `kartik-scaler.ProjectSCALER.orders`;
+
+-- 1.3
+Select distinct cust.customer_state, cust.customer_city
+from `kartik-scaler.ProjectSCALER.customers` cust
+join `kartik-scaler.ProjectSCALER.orders` ord
+on cust.customer_id = ord.customer_id;
+
+-- 2.1
+select YEAR, MONTH, count(*)
+from
+(select extract(Year from order_purchase_timestamp) YEAR, extract(Month from order_purchase_timestamp) MONTH
+from `kartik-scaler.ProjectSCALER.orders`
+)
+group by YEAR, MONTH
+order by YEAR, MONTH;
+
+--OR
+
+select extract(Year from order_purchase_timestamp) YEAR, extract(Month from order_purchase_timestamp) MONTH, count(*)
+from `kartik-scaler.ProjectSCALER.orders`
+group by YEAR, MONTH 
+order by YEAR, MONTH;
+
+-- 2.2
+select Time_of_Day, count(*) Total_Order
+from (select 
+CASE
+  when extract(hour from order_purchase_timestamp) between 18 and 23
+    then 'Night'
+  when extract(hour from order_purchase_timestamp) between 12 and 17
+    then 'Afternoon'
+  when extract(hour from order_purchase_timestamp) between 6 and 11
+    then 'Morning'
+  when extract(hour from order_purchase_timestamp) = 5
+    then 'Dawn'
+  else 'Night'
+END Time_of_Day
+from `kartik-scaler.ProjectSCALER.orders`)
+group by Time_of_Day;
+
+-- 3.1
+select cust.customer_state, extract(Month from odr.order_purchase_timestamp) Month, extract(Year from odr.order_purchase_timestamp) Year,
+count(odr.order_purchase_timestamp) No_of_Orders
+from `kartik-scaler.ProjectSCALER.customers` cust
+join `kartik-scaler.ProjectSCALER.orders` odr
+on cust.customer_id = odr.customer_id
+group by cust.customer_state , Month, Year
+order by cust.customer_state, Month, Year, No_of_Orders;
+
+-- 3.2
+select distinct customer_state, count(*) Customers_in_State
+from `kartik-scaler.ProjectSCALER.customers`
+group by customer_state
+order by Customers_in_State desc;
+
+-- 4.1
+select tb1.Month_2017 Month_of_Year, round(tb1.Cost_of_Order,2) Cost_of_Order_2017, round(tb2.Cost_of_Order,2) Cost_of_Order_2017,
+round(tb2.Cost_of_Order/tb1.Cost_of_Order,2) Percent_Increase_in_Cost
+from
+(select extract(month from odr.order_purchase_timestamp) Month_2017, sum(py.payment_value) - sum(odrit.price + odrit.freight_value) Cost_of_Order
+from `kartik-scaler.ProjectSCALER.orders` odr 
+join `kartik-scaler.ProjectSCALER.payments` py
+on odr.order_id = py.order_id
+join `kartik-scaler.ProjectSCALER.order_items` odrit
+on py.order_id = odrit.order_id
+where extract(month from odr.order_purchase_timestamp) between 1 and 8 and extract(Year from odr.order_purchase_timestamp) = 2017
+group by Month_2017
+order by Month_2017) tb1
+join 
+(select extract(month from odr.order_purchase_timestamp) Month_2018, sum(py.payment_value) - sum(odrit.price + odrit.freight_value) Cost_of_Order
+from `kartik-scaler.ProjectSCALER.orders` odr 
+join `kartik-scaler.ProjectSCALER.payments` py
+on odr.order_id = py.order_id
+join `kartik-scaler.ProjectSCALER.order_items` odrit
+on py.order_id = odrit.order_id
+where extract(month from odr.order_purchase_timestamp) between 1 and 8 and extract(Year from odr.order_purchase_timestamp) = 2018
+group by Month_2018
+order by Month_2018) tb2
+on tb1.Month_2017 = tb2.Month_2018
+order by Month_of_Year;
+
+-- 4.2
+select cust.Customer_State, round(sum(ordit.freight_value),2) Total_Freight, round(sum(ordit.price),2)Total_Price, 
+round(avg(ordit.freight_value),2) Mean_Freight, round(avg(ordit.price),2) Mean_Price
+from `kartik-scaler.ProjectSCALER.orders` ord
+left join `kartik-scaler.ProjectSCALER.order_items` ordit
+on ord.order_id = ordit.order_id
+join `kartik-scaler.ProjectSCALER.customers` cust
+on ord.customer_id = cust.customer_id
+group by cust.customer_state
+order by Mean_Price desc;
+
+--5.1 & 5.2
+SELECT Date(order_purchase_timestamp) Purchase_Date, 
+DATE_DIFF(order_delivered_customer_date,order_purchase_timestamp, DAY) Actual_Delivery_Days,
+DATE_DIFF(order_estimated_delivery_date,order_purchase_timestamp, DAY) Estimated_Delivery_Days
+FROM `kartik-scaler.ProjectSCALER.orders`
+where order_delivered_customer_date is Not null
+order by Purchase_Date;
+
+-- 5.3 
+/*
+time_to_delivery = order_purchase_timestamp-order_delivered_customer_date
+diff_estimated_delivery = order_estimated_delivery_date-order_delivered_customer_date
+
+Approach:
+  - Created a View
+  - Used View to drive answers for following questions
+*/
+/*
+create view ProjectSCALER.cust_group (cust, freight, delivery_time, estimeated_delivery_time) as 
+select odr.customer_id cust, avg(odrit.freight_value) freight, 
+avg(date_diff(odr.order_delivered_customer_date, odr.order_purchase_timestamp, DAY)) delivery_time,
+avg(date_diff(odr.order_estimated_delivery_date, odr.order_delivered_customer_date, DAY)) estimeated_delivery_time
+from `kartik-scaler.ProjectSCALER.orders` odr
+left join `kartik-scaler.ProjectSCALER.order_items` odrit
+on odr.order_id = odrit.order_id
+group by odr.customer_id; */
+
+select c.customer_state State, round(avg(cg.freight),2) Avg_Freight_Price, 
+round(avg(cg.delivery_time),2) Avg_Delivery_Time,
+round(avg(cg.estimeated_delivery_time),2) Avg_Est_Delivery_time
+from `kartik-scaler.ProjectSCALER.customers` c
+left join `kartik-scaler.ProjectSCALER.cust_group` cg
+on c.customer_id = cg.cust
+group by c.customer_state 
+order by Avg_Freight_Price desc, Avg_Delivery_Time desc, Avg_Est_Delivery_time desc;
+
+-- 5.4 
+-- 5.5
+    --- Top 5 States with Heighest Freight Value ---
+select c.customer_state State, round(avg(cg.freight),2) Avg_Freight_Price
+from `kartik-scaler.ProjectSCALER.customers` c
+left join `kartik-scaler.ProjectSCALER.cust_group` cg
+on c.customer_id = cg.cust
+group by c.customer_state 
+order by Avg_Freight_Price desc
+limit 5;
+
+    --- Top 5 States with Lowest Freight Value ---
+select c.customer_state State, round(avg(cg.freight),2) Avg_Freight_Price
+from `kartik-scaler.ProjectSCALER.customers` c
+left join `kartik-scaler.ProjectSCALER.cust_group` cg
+on c.customer_id = cg.cust
+group by c.customer_state 
+order by Avg_Freight_Price
+limit 5;
+
+-- 5.6
+    --- Top 5 States with Maximum Average Time to Delivery ---
+select c.customer_state State,
+round(avg(cg.delivery_time),2) Avg_Delivery_Time
+from `kartik-scaler.ProjectSCALER.customers` c
+left join `kartik-scaler.ProjectSCALER.cust_group` cg
+on c.customer_id = cg.cust
+group by c.customer_state 
+order by Avg_Delivery_Time desc
+limit 5;
+
+    --- Top 5 States with Minimum Average Time to Delivery ---
+select c.customer_state State,
+round(avg(cg.delivery_time),2) Avg_Delivery_Time
+from `kartik-scaler.ProjectSCALER.customers` c
+left join `kartik-scaler.ProjectSCALER.cust_group` cg
+on c.customer_id = cg.cust
+group by c.customer_state 
+order by Avg_Delivery_Time
+limit 5;
+
+-- 5.7
+    --- Top 5 states with fast delivery compared to estimated date -- delivery is really fast/ not so fast compared to estimated date
+
+select c.customer_state State_with_Fast_Delivery,
+round(avg(cg.delivery_time),2) Avg_Delivery_Time,
+round(avg(cg.estimeated_delivery_time),2) Avg_Est_Delivery_time
+from `kartik-scaler.ProjectSCALER.customers` c
+left join `kartik-scaler.ProjectSCALER.cust_group` cg
+on c.customer_id = cg.cust
+group by c.customer_state 
+order by (round(avg(cg.estimeated_delivery_time),2) - round(avg(cg.delivery_time),2)) desc
+limit 5;
+
+  --- Top 5 states with not as fast delivery compared to estimated date --
+select c.customer_state State_with_Slow_Delivery,
+round(avg(cg.delivery_time),2) Avg_Delivery_Time,
+round(avg(cg.estimeated_delivery_time),2) Avg_Est_Delivery_time
+from `kartik-scaler.ProjectSCALER.customers` c
+left join `kartik-scaler.ProjectSCALER.cust_group` cg
+on c.customer_id = cg.cust
+group by c.customer_state 
+order by (round(avg(cg.estimeated_delivery_time),2) - round(avg(cg.delivery_time),2)) asc
+limit 5;
+
+-- 6.1
+select distinct payment_type
+from `kartik-scaler.ProjectSCALER.payments`;
+
+select extract(YEAR from o.order_purchase_timestamp) Year,
+extract(MONTH from o.order_purchase_timestamp) Month, 
+count(case when p.payment_type = 'credit_card' then 1 end) Credit_Card,
+count(case when p.payment_type = 'voucher' then 2 end) Voucher,
+count(case when p.payment_type = 'debit_card' then 3 end) Debit_Card,
+count(case when p.payment_type = 'UPI' then 4 end) UPI,
+count(case when p.payment_type = 'not_defined' then 5 end) Not_Defined
+from `kartik-scaler.ProjectSCALER.orders` o
+left join `kartik-scaler.ProjectSCALER.payments` p
+on o.order_id = p.order_id
+group by Year, Month
+order by Year, Month;
+
+--6.2
+SELECT Payment_Installments, count(order_id) No_of_Orders
+from `kartik-scaler.ProjectSCALER.payments`
+group by Payment_Installments
+order by Payment_Installments
+
+
+
+
+
+
+
